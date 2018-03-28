@@ -1,0 +1,6 @@
+## [Ubuntu 16.04 에서 블루투스 연결은 되었다고 나오지만 사운드는 나오지 않는 경우]
+
+- 아래와 같이 블루투스 설정 화면으로 가서 Mode 를 High Fidelity Playback(A2DP Sink) 로 변경하면 된다 
+
+![Alt description](https://github.com/jjeaby/jjeaby.github.io/blob/master/ubuntu/UbuntuBlueToothSetting.png?raw=true)
+
