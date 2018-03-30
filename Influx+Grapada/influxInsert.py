@@ -16,7 +16,7 @@
 """Tutorial on using the InfluxDB client."""
 
 import argparse
-
+import datetime
 from influxdb import InfluxDBClient
 
 
@@ -25,50 +25,47 @@ def main(host='13.58.148.61', port=8086):
     user = 'jjeaby'
     password = 'test1111'
     dbname = 'testdb'
-    dbuser = 'jjeaby'
-    dbuser_password = 'test1111'
     query = 'select value from cpu_load_short;'
-    json_body = [
-        {
-            "measurement": "cpu_load_short",
-            "tags": {
-                "host": "server01",
-                "region": "us-west"
-            },
-            "time": "2009-11-10T23:00:00Z",
-            "fields": {
-                "Float_value": 0.64,
-                "Int_value": 3,
-                "String_value": "Text",
-                "Bool_value": True
-            }
-        }
-    ]
 
     client = InfluxDBClient(host, port, user, password, dbname)
-
-    print("Create a retention policy")
-    client.create_retention_policy('awesome_policy', '3d', 3, default=True)
-
-    print("Switch user: " + dbuser)
-    client.switch_user(dbuser, dbuser_password)
 
     print("Write : cpu,atag=test1 idle=100,usertime=10,system=1")
     client.write(['cpu,atag=test1 idle=100,usertime=10,system=1'], {'db': dbname}, 204, 'line')
 
-    print("Write points: {0}".format(json_body))
-    client.write_points(json_body, database=dbname)
-    #
-    # print("Querying data: " + query)
-    # result = client.query(query)
-    #
-    # print("Result: {0}".format(result))
-    #
-    # print("Switch user: " + user)
-    # client.switch_user(user, password)
-    #
-    # print("Drop database: " + dbname)
-    # client.drop_database(dbname)
+    now = datetime.datetime.now()
+    points = []
+    point = {
+        "measurement": 'chq',
+        "time": str(now.strftime('%Y-%m-%d %H:%M:%S')),
+        "fields": {
+            'machine_ip_address': '192.168.10.210',
+            'machine_name': 'rosamia',
+            'machine_os_platform': 'Linux',
+            'memory_total': 129363,
+            'memory_used': 87786,
+            'cpu_temperature': 31.0,
+            'cpu_usage': '5.5',
+            'gpu_free_memory_0': ' 11162',
+            'gpu_index_id_0': ' 0',
+            'gpu_name_0': ' GeForce GTX 1080 Ti',
+            'gpu_temperature_0': ' 49',
+            'gpu_total_memory_0': ' 11172',
+            'gpu_used_memory_0': ' 10',
+            'gpu_uuid_0': 'GPU-fbce4a93-3a20-a778-aa32-4b396f8df6d8',
+            'gpu_free_memory_1': ' 6624',
+            'gpu_index_id_1': ' 1',
+            'gpu_name_1': ' GeForce GTX 1080 Ti',
+            'gpu_temperature_1': ' 49',
+            'gpu_total_memory_1': ' 11171',
+            'gpu_used_memory_1': ' 4547',
+            'gpu_uuid_1': 'GPU-5fa30715-d37c-d266-0f11-e76c147b809a',
+        }
+    }
+
+    points = []
+    points.append(point)
+
+    client.write_points(points)
 
 
 def parse_args():
