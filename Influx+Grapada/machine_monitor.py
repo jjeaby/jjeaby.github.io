@@ -68,14 +68,80 @@ def memory_information():
     return memory_info
 
 
-def cpu_infomation():
-    cpu_usage = str(round(float(
-        os.popen(
-            '''grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {print usage }' ''').readline()),
-        1))
+def get_cpu_status():
+    # http://stackoverflow.com/questions/23367857/accurate-calculation-of-cpu-usage-given-in-percentage-in-linux
+    # read in cpu information from file
+    # The meanings of the columns are as follows, from left to right:
+    # 0cpuid: number of cpu
+    # 1user: normal processes executing in user mode
+    # 2nice: niced processes executing in user mode
+    # 3system: processes executing in kernel mode
+    # 4idle: twiddling thumbs
+    # 5iowait: waiting for I/O to complete
+    # 6irq: servicing interrupts
+    # 7softirq: servicing softirqs
+    # 8steal:
+    # 9guest:
+    # 10guest_nice:
+    #
+    # #the formulas from htop
+    #      user    nice   system  idle      iowait irq   softirq  steal  guest  guest_nice
+    # cpu  74608   2520   24433   1117073   6176   4054  0        0      0      0
+    #
+    #
+    # Idle=idle+iowait
+    # NonIdle=user+nice+system+irq+softirq+steal
+    # Total=Idle+NonIdle # first line of file for all cpus
+    #
+    # CPU_Percentage=((Total-PrevTotal)-(Idle-PrevIdle))/(Total-PrevTotal)
 
-    cpu_info = {"cpu_usage": cpu_usage}
-    cpu_temperature = subprocess.check_output(['cat', '/sys/class/thermal/thermal_zone0/temp']).decode("utf-8")
+    cpu_infos = {}  # collect here the information
+    with open("/proc/stat", "r") as f_stat:
+        lines = [line.split(" ") for content in f_stat.readlines() for line in content.split('\n') if
+                 line.startswith("cpu")]
+
+        # compute for every cpu
+        for cpu_line in lines:
+            if '' in cpu_line: cpu_line.remove('')  # remove empty elements
+            cpu_line = [cpu_line[0]] + [float(i) for i in cpu_line[1:]]  # type casting
+            cpu_id, user, nice, system, idle, iowait, irq, softrig, steal, guest, guest_nice = cpu_line
+
+            Idle = idle + iowait
+            NonIdle = user + nice + system + irq + softrig + steal
+
+            Total = Idle + NonIdle
+            # update dictionionary
+            cpu_infos.update({cpu_id: {"total": Total, "idle": Idle}})
+        return cpu_infos
+
+
+def cpu_infomation():
+    start = get_cpu_status()
+    # wait a second
+    time.sleep(0.1)
+    stop = get_cpu_status()
+
+    cpu_load = {}
+
+    for cpu in start:
+        Total = stop[cpu]["total"]
+        PrevTotal = start[cpu]["total"]
+
+        Idle = stop[cpu]["idle"]
+        PrevIdle = start[cpu]["idle"]
+        CPU_Percentage = ((Total - PrevTotal) - (Idle - PrevIdle)) / (Total - PrevTotal) * 100
+        cpu_load.update({cpu: CPU_Percentage})
+
+    cpu_info = {"cpu_usage": str(round(cpu_load["cpu"], 2))}
+    # device_type = subprocess.check_output(['cat', '/sys/class/thermal/thermal_zone*/type']).decode("utf-8")
+    device_type = os.popen('cat /sys/class/thermal/thermal_zone*/type').readlines()
+    device_temperature = os.popen('cat /sys/class/thermal/thermal_zone*/temp').readlines()
+    cpu_temperature = 0
+    for idx, device in enumerate(device_type):
+        if str(device).startswith("x86_pkg"):
+            cpu_temperature = device_temperature[idx]
+            break
+
     cpu_info["cpu_temperature"] = float(cpu_temperature) / 1000
 
     return cpu_info
@@ -83,10 +149,11 @@ def cpu_infomation():
 
 def influxInput(server_info):
     host = '13.58.148.61'
+    host = '127.0.0.1'
     port = 8086
     """Instantiate a connection to the InfluxDB."""
     user = 'jjeaby'
-    password = 'test1111'
+    password = 'jjeaby'
     dbname = 'testdb'
 
     client = InfluxDBClient(host, port, user, password, dbname)
@@ -100,9 +167,9 @@ def influxInput(server_info):
     gpu = server_info["gpu"]
 
     fields_data = {}
-
+    tags_data = {}
     for data in dict(machine.items()):
-        fields_data[data] = machine[data].strip()
+        tags_data[data] = machine[data].strip()
     for data in dict(cpu.items()):
         fields_data[data] = cpu[data]
     for data in dict(memory.items()):
@@ -110,16 +177,20 @@ def influxInput(server_info):
     for idx, list in enumerate(gpu):
         for data in dict(list.items()):
             fields_data[data] = gpu[idx][data].strip()
+    tags_data = json.dumps(tags_data)
     fields_data = json.dumps(fields_data)
+    print(tags_data)
     print(fields_data)
     now = datetime.datetime.today()
     print(now)
     points = []
     point = {"measurement": 'machine_information',
-             # "time": str(now.strftime('%Y-%m-%d %H:%M:%S')),
-             "time": 1000000000 * int(now.strftime('%s')),
+             # "time": now.strftime('%Y-%m-%d %H:%M:%S'),
+             # "time": 1000000000 * int(now.strftime('%s')),
+             # "time": int(round(time.time() * 1000)),
              # "fields": fields_data
              }
+    point["tags"] = json.loads(tags_data)
     point["fields"] = json.loads(fields_data)
 
     print(point)
