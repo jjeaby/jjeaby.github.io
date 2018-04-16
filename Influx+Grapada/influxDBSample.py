@@ -20,10 +20,10 @@ import datetime
 from influxdb import InfluxDBClient
 
 
-def main(host='13.58.148.61', port=8086):
+def main(host='127.0.0.1', port=8086):
     """Instantiate a connection to the InfluxDB."""
     user = 'jjeaby'
-    password = 'test1111'
+    password = 'jjeaby'
     dbname = 'testdb'
     query = 'select value from cpu_load_short;'
 
@@ -68,12 +68,34 @@ def main(host='13.58.148.61', port=8086):
     client.write_points(points)
 
 
+    print("Create database: " + dbname)
+    client.create_database(dbname)
+
+    print("Create a retention policy")
+    client.create_retention_policy('awesome_policy', '3d', 3, default=True)
+
+    print("Switch user: " + user)
+    client.switch_user(user, password)
+
+
+    print("Querying data: " + query)
+    result = client.query(query)
+
+    print("Result: {0}".format(result))
+
+    print("Switch user: " + user)
+    client.switch_user(user, password)
+
+    print("Drop database: " + dbname)
+    client.drop_database(dbname)
+
+
 def parse_args():
     """Parse the args."""
     parser = argparse.ArgumentParser(
         description='example code to play with InfluxDB')
     parser.add_argument('--host', type=str, required=False,
-                        default='13.58.148.61',
+                        default='127.0.0.1',
                         help='hostname of InfluxDB http API')
     parser.add_argument('--port', type=int, required=False, default=8086,
                         help='port of InfluxDB http API')
